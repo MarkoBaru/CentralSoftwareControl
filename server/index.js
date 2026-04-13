@@ -6,6 +6,8 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
 const checkStatusRoutes = require('./routes/checkStatus');
+const userRoutes = require('./routes/users');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -33,6 +35,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/check-status', checkStatusRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Client-SDK statisch ausliefern
 app.use('/client', express.static(path.join(__dirname, '..', 'client-sdk')));
