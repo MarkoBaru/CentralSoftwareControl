@@ -43,6 +43,33 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS payment_settings (
+    id TEXT PRIMARY KEY,
+    project_id TEXT UNIQUE NOT NULL,
+    monthly_amount REAL NOT NULL DEFAULT 0,
+    reference_number TEXT,
+    buffer_months INTEGER NOT NULL DEFAULT 3,
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly' CHECK(billing_cycle IN ('monthly', 'yearly')),
+    auto_block INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS payments (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    amount REAL NOT NULL,
+    reference_number TEXT,
+    payment_date TEXT NOT NULL,
+    period_month INTEGER NOT NULL,
+    period_year INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'confirmed' CHECK(status IN ('confirmed', 'pending', 'failed')),
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+  );
 `);
 
 module.exports = db;
