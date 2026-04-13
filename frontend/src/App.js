@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { FiGrid, FiFolder, FiLogOut } from 'react-icons/fi';
+import { FiGrid, FiFolder, FiUsers, FiLogOut } from 'react-icons/fi';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import NewProjectPage from './pages/NewProjectPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import UsersPage from './pages/UsersPage';
 import './App.css';
 
 function Layout({ children }) {
@@ -21,6 +22,9 @@ function Layout({ children }) {
           </NavLink>
           <NavLink to="/projects/new" className={({ isActive }) => isActive ? 'active' : ''}>
             <FiFolder /> Neues Projekt
+          </NavLink>
+          <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''}>
+            <FiUsers /> Benutzer
           </NavLink>
         </div>
         <div className="sidebar-user">
@@ -53,6 +57,7 @@ function App() {
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/projects/new" element={<ProtectedRoute><NewProjectPage /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

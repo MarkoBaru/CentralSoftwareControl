@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiArrowLeft, FiCopy, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 import api from '../api';
+import PaymentSection from '../components/PaymentSection';
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -246,6 +247,11 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Zahlungsbereich */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <PaymentSection projectId={id} />
       </div>
     </div>
   );
