@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const logger = require('./services/logger');
 
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
@@ -16,6 +18,35 @@ const { startCronJobs } = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Security-Header (Helmet) - CSP angepasst fuer React-CRA inline-styles
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'"],
+      'style-src': ["'self'", "'unsafe-inline'"],
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'connect-src': ["'self'"],
+      'font-src': ["'self'", 'data:'],
+      'object-src': ["'none'"],
+      'frame-ancestors': ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// Request-Logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    logger.info({ method: req.method, path: req.path, status: res.statusCode, ms, ip: req.ip }, 'request');
+  });
+  next();
+});
 
 // Middleware — Manuelle CORS-Header (Express 5 kompatibel)
 app.use((req, res, next) => {
