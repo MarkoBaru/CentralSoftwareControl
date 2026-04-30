@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
@@ -32,9 +33,28 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+
+// Rate-Limiting für Login (Brute-Force-Schutz): 5 Versuche / 15 Min pro IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Login-Versuche. Bitte versuchen Sie es in 15 Minuten erneut.' },
+});
+
+// Allgemeines API-Limit: 300 Requests / 15 Min
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // API-Routen
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/check-status', checkStatusRoutes);
