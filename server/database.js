@@ -110,5 +110,23 @@ safeAddColumn('projects', 'client_city', 'TEXT');
 safeAddColumn('invoices', 'qr_reference', 'TEXT');
 safeAddColumn('payment_settings', 'auto_invoice', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('payment_settings', 'invoice_day', 'INTEGER NOT NULL DEFAULT 1');
+safeAddColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('invoices', 'last_reminder_at', 'TEXT');
+
+// Migration: Klartext-Geheimnisse in app_settings nachtraeglich verschluesseln
+try {
+  const { encrypt, isEncrypted } = require('./services/crypto');
+  const SECRET_KEYS = ['smtp_pass', 'bank_api_key'];
+  const upsert = db.prepare(`UPDATE app_settings SET value = ?, updated_at = datetime('now') WHERE key = ?`);
+  for (const key of SECRET_KEYS) {
+    const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
+    if (row && row.value && !isEncrypted(row.value)) {
+      upsert.run(encrypt(row.value), key);
+      console.log(`[DB] ${key} nachtraeglich verschluesselt`);
+    }
+  }
+} catch (e) {
+  console.warn('[DB] Migration Verschluesselung uebersprungen:', e.message);
+}
 
 module.exports = db;

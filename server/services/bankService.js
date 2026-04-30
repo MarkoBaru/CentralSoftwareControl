@@ -1,6 +1,7 @@
 const axios = require('axios');
 const xml2js = require('xml2js');
 const db = require('../database');
+const { decrypt } = require('./crypto');
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM app_settings').all();
@@ -82,7 +83,7 @@ async function fetchPaymentsFromBankAPI() {
   if (!s.bank_api_url || !s.bank_api_key) return [];
 
   try {
-    const headers = { Authorization: `Bearer ${s.bank_api_key}` };
+    const headers = { Authorization: `Bearer ${decrypt(s.bank_api_key)}` };
     const params = {};
     if (s.bank_api_account) params.account = s.bank_api_account;
 

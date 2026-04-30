@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database');
 const authMiddleware = require('../middleware/auth');
+const { encrypt, isEncrypted } = require('../services/crypto');
 
 const router = express.Router();
 
@@ -15,12 +16,13 @@ const ALLOWED_KEYS = [
   'payment_check_enabled',
 ];
 
-// GET /api/settings - Alle Einstellungen laden (smtp_pass wird maskiert)
+// GET /api/settings - Alle Einstellungen laden (Geheimnisse werden maskiert)
 router.get('/', authMiddleware, (req, res) => {
   const rows = db.prepare('SELECT key, value FROM app_settings').all();
+  const SECRETS = ['smtp_pass', 'bank_api_key'];
   const result = {};
   rows.forEach(r => {
-    result[r.key] = r.key === 'smtp_pass' ? '••••••••' : r.value;
+    result[r.key] = SECRETS.includes(r.key) && r.value ? '••••••••' : r.value;
   });
   res.json(result);
 });
@@ -37,10 +39,15 @@ router.put('/', authMiddleware, (req, res) => {
   `);
 
   const saveMany = db.transaction((data) => {
+    const SECRETS = ['smtp_pass', 'bank_api_key'];
     for (const [key, value] of Object.entries(data)) {
       if (!ALLOWED_KEYS.includes(key)) continue;
-      // smtp_pass: leeres Feld oder Masken-Wert nicht überschreiben
-      if (key === 'smtp_pass' && (!value || value === '••••••••')) continue;
+      // Geheimnisse: leeres Feld oder Masken-Wert nicht überschreiben; sonst verschlüsselt ablegen
+      if (SECRETS.includes(key)) {
+        if (!value || value === '••••••••') continue;
+        upsert.run(key, isEncrypted(value) ? value : encrypt(String(value)));
+        continue;
+      }
       upsert.run(key, String(value));
     }
   });
@@ -98,6 +105,19 @@ router.post('/upload-camt', authMiddleware, async (req, res) => {
     const blocked = check.filter(r => r.action === 'blocked').length;
     const unblocked = check.filter(r => r.action === 'unblocked').length;
     res.json({ found: payments.length, processed, blocked, unblocked });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/settings/process-reminders - Mahnwesen manuell anstossen
+router.post('/process-reminders', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
+  const { processReminders, markOverdueInvoices } = require('../services/cronService');
+  try {
+    const overdue = markOverdueInvoices();
+    const sent = await processReminders();
+    res.json({ overdue_marked: overdue, reminders_sent: sent.length, details: sent });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

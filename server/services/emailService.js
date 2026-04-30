@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const db = require('../database');
+const { decrypt } = require('./crypto');
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM app_settings').all();
@@ -16,7 +17,7 @@ function createTransporter() {
     host: s.smtp_host,
     port: parseInt(s.smtp_port || '587'),
     secure: s.smtp_secure === 'true',
-    auth: { user: s.smtp_user, pass: s.smtp_pass },
+    auth: { user: s.smtp_user, pass: decrypt(s.smtp_pass) },
   });
 }
 
@@ -87,4 +88,36 @@ async function sendInvoiceMail(project, invoice, pdfBuffer) {
   });
 }
 
-module.exports = { sendMail, sendBlockNotification, sendUnblockNotification, sendInvoiceMail };
+async function sendPaymentReminder(project, invoice, level, pdfBuffer) {
+  if (!project.client_email) return false;
+  const s = getSettings();
+  const company = s.company_name || 'Control Dashboard';
+  const titles = { 1: 'Zahlungserinnerung', 2: '1. Mahnung', 3: '2. Mahnung (letzte Mahnung)' };
+  const intros = {
+    1: 'wir möchten Sie freundlich daran erinnern, dass die folgende Rechnung noch offen ist.',
+    2: 'unsere Zahlungserinnerung wurde noch nicht beglichen. Wir bitten Sie, den offenen Betrag umgehend zu überweisen.',
+    3: 'trotz mehrfacher Erinnerung ist die Rechnung weiterhin offen. Bitte begleichen Sie den Betrag innerhalb von 7 Tagen, andernfalls behalten wir uns rechtliche Schritte und eine Sperrung Ihres Zugangs vor.',
+  };
+  const title = titles[level] || 'Zahlungserinnerung';
+  const intro = intros[level] || intros[1];
+  return sendMail({
+    to: project.client_email,
+    subject: `[${company}] ${title} – Rechnung ${invoice.invoice_number}`,
+    html: `
+      <h2>${title}</h2>
+      <p>Sehr geehrte/r ${project.client_name},</p>
+      <p>${intro}</p>
+      <table style="border-collapse:collapse;margin:12px 0;">
+        <tr><td style="padding:4px 12px 4px 0;"><strong>Rechnung:</strong></td><td>${invoice.invoice_number}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;"><strong>Betrag:</strong></td><td>CHF ${invoice.amount.toFixed(2)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;"><strong>Faellig seit:</strong></td><td>${invoice.due_date || '–'}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;"><strong>Referenz:</strong></td><td>${invoice.qr_reference || invoice.invoice_number}</td></tr>
+      </table>
+      <p>Sollten Sie die Zahlung bereits veranlasst haben, betrachten Sie dieses Schreiben als gegenstandslos.</p>
+      <p>Mit freundlichen Grüssen<br/>${company}</p>
+    `,
+    attachments: pdfBuffer ? [{ filename: `${invoice.invoice_number}.pdf`, content: pdfBuffer }] : [],
+  });
+}
+
+module.exports = { sendMail, sendBlockNotification, sendUnblockNotification, sendInvoiceMail, sendPaymentReminder };
