@@ -70,15 +70,16 @@ if not exist "frontend\node_modules" (
 
 echo.
 echo ============================================
-echo   Starte Development Server...
+echo   Starte Development Server (smart)...
 echo ============================================
 echo.
-echo   Dashboard:  http://localhost:3000
-echo   API:        http://localhost:3001/api
+echo   - Belegte Ports werden geprueft
+echo   - Eigene Reste werden beendet
+echo   - Fremde Belegung -> Ausweich-Port
 echo.
 echo   Beenden mit: Ctrl+C
 echo ============================================
 echo.
 
-:: Dev-Server starten (Backend + Frontend parallel)
-call npm run dev
+:: Smart Dev-Launcher (Port-Check + Restart-Logik)
+call npm run dev:smart

@@ -7,6 +7,7 @@
     "server": "nodemon server/index.js",
     "client": "cd frontend && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:smart": "node scripts/dev-start.js",
     "build": "cd frontend && npm run build",
     "start": "node server/index.js",
     "test": "jest"
