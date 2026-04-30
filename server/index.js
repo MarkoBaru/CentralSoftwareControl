@@ -8,6 +8,9 @@ const projectRoutes = require('./routes/projects');
 const checkStatusRoutes = require('./routes/checkStatus');
 const userRoutes = require('./routes/users');
 const paymentRoutes = require('./routes/payments');
+const settingsRoutes = require('./routes/settings');
+const invoiceRoutes = require('./routes/invoices');
+const { startCronJobs } = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,6 +40,8 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/check-status', checkStatusRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // Client-SDK statisch ausliefern
 app.use('/client', express.static(path.join(__dirname, '..', 'client-sdk')));
@@ -54,4 +59,5 @@ app.listen(PORT, () => {
   console.log(`✓ Control Dashboard Server läuft auf Port ${PORT}`);
   console.log(`  Dashboard: http://localhost:${PORT}`);
   console.log(`  API:       http://localhost:${PORT}/api`);
+  startCronJobs();
 });
