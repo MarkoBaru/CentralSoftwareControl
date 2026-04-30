@@ -1,7 +1,230 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiShield, FiAlertTriangle, FiActivity, FiLayers, FiTool } from 'react-icons/fi';
+import { FiShield, FiAlertTriangle, FiActivity, FiLayers } from 'react-icons/fi';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
 import api from '../api';
+
+const MONTH_NAMES = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const PIE_COLORS = ['#22c55e','#ef4444','#f59e0b','#6366f1'];
+
+function buildMonthlyData(invoices) {
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ month: MONTH_NAMES[d.getMonth()], year: d.getFullYear(), m: d.getMonth() + 1, bezahlt: 0, offen: 0 });
+  }
+  invoices.forEach(inv => {
+    const slot = months.find(s => s.m === inv.period_month && s.year === inv.period_year);
+    if (!slot) return;
+    if (inv.status === 'paid') slot.bezahlt += inv.amount;
+    else if (inv.status === 'sent' || inv.status === 'overdue') slot.offen += inv.amount;
+  });
+  return months.map(s => ({ name: s.month, Bezahlt: Math.round(s.bezahlt), Offen: Math.round(s.offen) }));
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState({ total: 0, active: 0, blocked: 0, overdue: 0, maintenance: 0 });
+  const [projects, setProjects] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { loadData(); }, []);
+
+  const loadData = async () => {
+    try {
+      const [statsRes, projectsRes, invoicesRes] = await Promise.all([
+        api.getStats(), api.getProjects(), api.getInvoices().catch(() => ({ data: [] })),
+      ]);
+      setStats(statsRes.data);
+      setProjects(projectsRes.data);
+      setInvoices(invoicesRes.data);
+    } catch (err) {
+      console.error('Fehler beim Laden:', err);
+    }
+  };
+
+  const handleToggleBlock = async (project) => {
+    try {
+      await api.toggleBlock(project.id, !project.is_blocked);
+      loadData();
+    } catch (err) {
+      console.error('Fehler beim Blockieren:', err);
+    }
+  };
+
+  const filteredProjects = projects.filter((p) => {
+    if (filter === 'blocked') return p.is_blocked;
+    if (filter === 'active') return !p.is_blocked && p.status === 'active';
+    if (filter === 'overdue') return p.subscription_status === 'overdue';
+    if (filter === 'maintenance') return p.status === 'maintenance';
+    return true;
+  }).filter((p) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return p.name.toLowerCase().includes(q) || p.client_name.toLowerCase().includes(q);
+  });
+
+  const typeLabels = { website: 'Website', app: 'App', webapp: 'Web-App', other: 'Sonstige' };
+
+  const monthlyData = buildMonthlyData(invoices);
+  const pieData = [
+    { name: 'Aktiv', value: stats.active },
+    { name: 'Blockiert', value: stats.blocked },
+    { name: 'Überfällig', value: stats.overdue },
+    { name: 'Wartung', value: stats.maintenance },
+  ].filter(d => d.value > 0);
+
+  return (
+    <div>
+      <h1 style={{ marginBottom: '1.5rem' }}>Dashboard</h1>
+
+      <div className="stat-cards">
+        <div className="stat-card">
+          <div className="label">Gesamt Projekte</div>
+          <div className="value">{stats.total}</div>
+        </div>
+        <div className="stat-card success">
+          <div className="label">Aktiv</div>
+          <div className="value">{stats.active}</div>
+        </div>
+        <div className="stat-card danger">
+          <div className="label">Blockiert</div>
+          <div className="value">{stats.blocked}</div>
+        </div>
+        <div className="stat-card warning">
+          <div className="label">Zahlung überfällig</div>
+          <div className="value">{stats.overdue}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Wartung</div>
+          <div className="value">{stats.maintenance}</div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', margin: '1.5rem 0' }}>
+        <div className="card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', color: 'var(--gray-700)' }}>Umsatz – letzte 6 Monate (CHF)</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-200)" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(v) => `CHF ${v}`} />
+              <Legend />
+              <Bar dataKey="Bezahlt" fill="#22c55e" radius={[4,4,0,0]} />
+              <Bar dataKey="Offen" fill="#f59e0b" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', color: 'var(--gray-700)' }}>Projektstatus</h3>
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`}>
+                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-400)' }}>
+              Keine Daten
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        {['all', 'active', 'blocked', 'overdue', 'maintenance'].map((f) => (
+          <button
+            key={f}
+            className={`filter-chip ${filter === f ? 'active' : ''}`}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'all' ? 'Alle' : f === 'active' ? 'Aktiv' : f === 'blocked' ? 'Blockiert' : f === 'overdue' ? 'Überfällig' : 'Wartung'}
+          </button>
+        ))}
+        <input
+          className="search-box"
+          placeholder="Suche nach Name oder Kunde..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Projekte ({filteredProjects.length})</h2>
+          <Link to="/projects/new" className="btn btn-primary">+ Neues Projekt</Link>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Projekt</th>
+              <th>Kunde</th>
+              <th>Typ</th>
+              <th>Status</th>
+              <th>Abo</th>
+              <th>Blockiert</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProjects.map((project) => (
+              <tr key={project.id}>
+                <td>
+                  <Link to={`/projects/${project.id}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    {project.name}
+                  </Link>
+                </td>
+                <td>{project.client_name}</td>
+                <td>{typeLabels[project.type] || project.type}</td>
+                <td>
+                  <span className={`badge badge-${project.status}`}>
+                    {project.status === 'active' ? 'Aktiv' : project.status === 'blocked' ? 'Blockiert' : project.status === 'maintenance' ? 'Wartung' : 'Entwicklung'}
+                  </span>
+                </td>
+                <td>
+                  <span className={`badge ${project.subscription_status === 'active' ? 'badge-active' : project.subscription_status === 'overdue' ? 'badge-overdue' : 'badge-cancelled'}`}>
+                    {project.subscription_status === 'active' ? 'Aktiv' : project.subscription_status === 'overdue' ? 'Überfällig' : 'Gekündigt'}
+                  </span>
+                </td>
+                <td>
+                  <label className="toggle-switch" title={project.is_blocked ? 'Klicken zum Freigeben' : 'Klicken zum Blockieren'}>
+                    <input
+                      type="checkbox"
+                      checked={!!project.is_blocked}
+                      onChange={() => handleToggleBlock(project)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </td>
+                <td>
+                  <Link to={`/projects/${project.id}`} className="btn btn-ghost btn-sm">Details</Link>
+                </td>
+              </tr>
+            ))}
+            {filteredProjects.length === 0 && (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
+                  Keine Projekte gefunden
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ total: 0, active: 0, blocked: 0, overdue: 0, maintenance: 0 });
