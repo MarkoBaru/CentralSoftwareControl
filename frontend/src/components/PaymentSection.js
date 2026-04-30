@@ -160,6 +160,18 @@ export default function PaymentSection({ projectId }) {
                   Automatisches Blockieren bei ausbleibender Zahlung
                 </label>
               </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" checked={!!settingsForm.auto_invoice} onChange={(e) => setSettingsForm({ ...settingsForm, auto_invoice: e.target.checked ? 1 : 0 })} />
+                    Wiederkehrende Rechnung automatisch erstellen
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>Tag im Monat (Rechnung)</label>
+                  <input type="number" min="1" max="28" value={settingsForm.invoice_day != null ? settingsForm.invoice_day : 1} onChange={(e) => setSettingsForm({ ...settingsForm, invoice_day: parseInt(e.target.value) || 1 })} />
+                </div>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="submit" className="btn btn-primary">Speichern</button>
               </div>

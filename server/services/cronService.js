@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const db = require('../database');
 const { v4: uuidv4 } = require('uuid');
-const { sendBlockNotification, sendUnblockNotification } = require('./emailService');
+const { sendBlockNotification, sendUnblockNotification, sendInvoiceMail } = require('./emailService');
 const { syncBankPayments } = require('./bankService');
 
 /**
@@ -80,14 +80,68 @@ async function checkAllProjects() {
 }
 
 /**
+ * Generiert wiederkehrende Rechnungen für Projekte mit auto_invoice=1.
+ * Wird täglich geprüft – erstellt Rechnung wenn invoice_day = heute UND
+ * für den aktuellen Monat noch keine existiert.
+ */
+async function generateRecurringInvoices() {
+  const today = new Date();
+  const day = today.getDate();
+  const month = today.getMonth() + 1;
+  const year = today.getFullYear();
+
+  const settings = db.prepare(`
+    SELECT ps.*, p.name as project_name, p.client_email
+    FROM payment_settings ps
+    JOIN projects p ON ps.project_id = p.id
+    WHERE ps.auto_invoice = 1 AND ps.invoice_day = ? AND ps.monthly_amount > 0
+  `).all(day);
+
+  const created = [];
+
+  for (const s of settings) {
+    // Schon eine Rechnung für diesen Zeitraum?
+    const existing = db.prepare(
+      "SELECT id FROM invoices WHERE project_id = ? AND period_month = ? AND period_year = ? AND status != 'cancelled'"
+    ).get(s.project_id, month, year);
+    if (existing) continue;
+
+    try {
+      // Lazy-load um Zirkular-Imports zu vermeiden
+      const invoiceHelper = require('../routes/invoices');
+      const result = invoiceHelper.createRecurringInvoice
+        ? await invoiceHelper.createRecurringInvoice(s.project_id, s.monthly_amount, month, year)
+        : null;
+      if (result) created.push(result);
+    } catch (err) {
+      console.error(`[Cron] Rechnung für ${s.project_name} fehlgeschlagen:`, err.message);
+    }
+  }
+
+  return created;
+}
+
+/**
+ * Markiert offene Rechnungen als überfällig wenn due_date < heute.
+ */
+function markOverdueInvoices() {
+  const result = db.prepare(`
+    UPDATE invoices
+    SET status = 'overdue'
+    WHERE status = 'sent' AND due_date IS NOT NULL AND due_date < date('now')
+  `).run();
+  return result.changes;
+}
+
+/**
  * Cron-Jobs starten.
- * Täglich 08:00 Uhr: Bank-Sync + Zahlungsstatus prüfen
- * Täglich 09:00 Uhr: Rechnungsversand fällige Rechnungen
+ * Täglich 08:00 Uhr: Bank-Sync + Zahlungsstatus prüfen + Rechnungen generieren + Überfällig markieren
  */
 function startCronJobs() {
-  // Täglich 08:00 – Bank-Sync + Zahlungsprüfung
   cron.schedule('0 8 * * *', async () => {
-    console.log('[Cron] Bank-Sync gestartet...');
+    console.log('[Cron] Tägliche Aufgaben gestartet...');
+
+    // 1. Bank-Sync
     try {
       const syncResult = await syncBankPayments();
       console.log(`[Cron] Bank-Sync: ${syncResult.fetched} Transaktionen, ${syncResult.processed} verarbeitet`);
@@ -95,12 +149,28 @@ function startCronJobs() {
       console.error('[Cron] Bank-Sync Fehler:', e.message);
     }
 
-    console.log('[Cron] Zahlungsstatus-Prüfung...');
+    // 2. Wiederkehrende Rechnungen generieren
+    try {
+      const invoices = await generateRecurringInvoices();
+      if (invoices.length > 0) console.log(`[Cron] ${invoices.length} wiederkehrende Rechnung(en) erstellt`);
+    } catch (e) {
+      console.error('[Cron] Auto-Rechnung Fehler:', e.message);
+    }
+
+    // 3. Überfällige Rechnungen markieren
+    try {
+      const overdueCount = markOverdueInvoices();
+      if (overdueCount > 0) console.log(`[Cron] ${overdueCount} Rechnung(en) als überfällig markiert`);
+    } catch (e) {
+      console.error('[Cron] Überfällig-Fehler:', e.message);
+    }
+
+    // 4. Block-Status prüfen
     try {
       const results = await checkAllProjects();
       const blocked = results.filter(r => r.action === 'blocked').length;
       const unblocked = results.filter(r => r.action === 'unblocked').length;
-      console.log(`[Cron] Prüfung abgeschlossen: ${blocked} blockiert, ${unblocked} freigegeben`);
+      console.log(`[Cron] Statusprüfung: ${blocked} blockiert, ${unblocked} freigegeben`);
     } catch (e) {
       console.error('[Cron] Prüfungsfehler:', e.message);
     }
@@ -109,4 +179,4 @@ function startCronJobs() {
   console.log('[Cron] Jobs gestartet (täglich 08:00 Uhr Europe/Zurich)');
 }
 
-module.exports = { startCronJobs, checkAndUpdateBlockStatus, checkAllProjects };
+module.exports = { startCronJobs, checkAndUpdateBlockStatus, checkAllProjects, generateRecurringInvoices, markOverdueInvoices };

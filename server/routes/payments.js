@@ -32,7 +32,7 @@ router.put('/settings/:projectId', authMiddleware, (req, res) => {
     return res.status(404).json({ error: 'Projekt nicht gefunden' });
   }
 
-  const { monthly_amount, reference_number, buffer_months, billing_cycle, auto_block } = req.body;
+  const { monthly_amount, reference_number, buffer_months, billing_cycle, auto_block, auto_invoice, invoice_day } = req.body;
 
   const existing = db.prepare('SELECT id FROM payment_settings WHERE project_id = ?').get(req.params.projectId);
 
@@ -44,6 +44,8 @@ router.put('/settings/:projectId', authMiddleware, (req, res) => {
         buffer_months = ?,
         billing_cycle = ?,
         auto_block = ?,
+        auto_invoice = ?,
+        invoice_day = ?,
         updated_at = datetime('now')
       WHERE project_id = ?
     `).run(
@@ -52,12 +54,14 @@ router.put('/settings/:projectId', authMiddleware, (req, res) => {
       buffer_months != null ? buffer_months : 3,
       billing_cycle === 'yearly' ? 'yearly' : 'monthly',
       auto_block != null ? (auto_block ? 1 : 0) : 1,
+      auto_invoice ? 1 : 0,
+      invoice_day != null ? Math.min(28, Math.max(1, parseInt(invoice_day))) : 1,
       req.params.projectId
     );
   } else {
     db.prepare(`
-      INSERT INTO payment_settings (id, project_id, monthly_amount, reference_number, buffer_months, billing_cycle, auto_block)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO payment_settings (id, project_id, monthly_amount, reference_number, buffer_months, billing_cycle, auto_block, auto_invoice, invoice_day)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       uuidv4(),
       req.params.projectId,
@@ -65,7 +69,9 @@ router.put('/settings/:projectId', authMiddleware, (req, res) => {
       reference_number || null,
       buffer_months != null ? buffer_months : 3,
       billing_cycle === 'yearly' ? 'yearly' : 'monthly',
-      auto_block != null ? (auto_block ? 1 : 0) : 1
+      auto_block != null ? (auto_block ? 1 : 0) : 1,
+      auto_invoice ? 1 : 0,
+      invoice_day != null ? Math.min(28, Math.max(1, parseInt(invoice_day))) : 1
     );
   }
 
