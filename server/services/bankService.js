@@ -112,7 +112,7 @@ async function fetchPaymentsFromBankAPI() {
  * Sucht für jede Referenznummer das passende Projekt und bucht die Zahlung.
  * Gibt Anzahl der verarbeiteten Zahlungen zurück.
  */
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 
 function processPayments(payments) {
   let processed = 0;
