@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const db = require('../database');
 const { v4: uuidv4 } = require('uuid');
-const { sendBlockNotification, sendUnblockNotification, sendInvoiceMail } = require('./emailService');
+const { sendBlockNotification, sendUnblockNotification, sendInvoiceMail, sendPaymentReminder } = require('./emailService');
 const { syncBankPayments } = require('./bankService');
 
 /**
@@ -134,6 +134,58 @@ function markOverdueInvoices() {
 }
 
 /**
+ * Mahnwesen: sendet Erinnerungen / Mahnungen fuer ueberfaellige Rechnungen.
+ * Stufen:
+ *   Level 1 (Erinnerung)  - 7 Tage nach Faelligkeit, reminder_count = 0
+ *   Level 2 (1. Mahnung)  - 14 Tage nach letzter Mahnung, reminder_count = 1
+ *   Level 3 (2. Mahnung)  - 14 Tage nach letzter Mahnung, reminder_count = 2
+ */
+async function processReminders() {
+  const candidates = db.prepare(`
+    SELECT * FROM invoices
+    WHERE status = 'overdue' AND reminder_count < 3
+  `).all();
+
+  const sent = [];
+  let generatePDF;
+  try { generatePDF = require('../routes/invoices').generatePDF; } catch (_) { /* lazy */ }
+
+  for (const invoice of candidates) {
+    const dueMs = invoice.due_date ? Date.parse(invoice.due_date) : null;
+    if (!dueMs) continue;
+    const daysOverdue = Math.floor((Date.now() - dueMs) / 86400000);
+    const lastMs = invoice.last_reminder_at ? Date.parse(invoice.last_reminder_at) : null;
+    const daysSinceLast = lastMs ? Math.floor((Date.now() - lastMs) / 86400000) : Infinity;
+
+    let level = 0;
+    if (invoice.reminder_count === 0 && daysOverdue >= 7) level = 1;
+    else if (invoice.reminder_count === 1 && daysSinceLast >= 14) level = 2;
+    else if (invoice.reminder_count === 2 && daysSinceLast >= 14) level = 3;
+    if (!level) continue;
+
+    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(invoice.project_id);
+    if (!project || !project.client_email) continue;
+
+    try {
+      const settings = db.prepare('SELECT key, value FROM app_settings').all().reduce((a, r) => (a[r.key] = r.value, a), {});
+      let pdfBuffer = null;
+      if (generatePDF) {
+        try { pdfBuffer = await generatePDF(project, invoice, settings); } catch (e) { console.error('[Cron] PDF fuer Mahnung fehlgeschlagen:', e.message); }
+      }
+      await sendPaymentReminder(project, invoice, level, pdfBuffer);
+      db.prepare(`UPDATE invoices SET reminder_count = ?, last_reminder_at = datetime('now') WHERE id = ?`).run(level, invoice.id);
+      db.prepare('INSERT INTO activity_log (id, project_id, action, details, performed_by) VALUES (?, ?, ?, ?, ?)').run(
+        uuidv4(), invoice.project_id, 'invoice_reminder', `Mahnstufe ${level} fuer Rechnung ${invoice.invoice_number} versendet`, 'System'
+      );
+      sent.push({ invoice: invoice.invoice_number, level });
+    } catch (e) {
+      console.error('[Cron] Mahnung fehlgeschlagen:', e.message);
+    }
+  }
+  return sent;
+}
+
+/**
  * Cron-Jobs starten.
  * Täglich 08:00 Uhr: Bank-Sync + Zahlungsstatus prüfen + Rechnungen generieren + Überfällig markieren
  */
@@ -165,6 +217,14 @@ function startCronJobs() {
       console.error('[Cron] Überfällig-Fehler:', e.message);
     }
 
+    // 3b. Mahnungen versenden
+    try {
+      const reminders = await processReminders();
+      if (reminders.length > 0) console.log(`[Cron] ${reminders.length} Mahnung(en) versendet`);
+    } catch (e) {
+      console.error('[Cron] Mahnwesen-Fehler:', e.message);
+    }
+
     // 4. Block-Status prüfen
     try {
       const results = await checkAllProjects();
@@ -179,4 +239,4 @@ function startCronJobs() {
   console.log('[Cron] Jobs gestartet (täglich 08:00 Uhr Europe/Zurich)');
 }
 
-module.exports = { startCronJobs, checkAndUpdateBlockStatus, checkAllProjects, generateRecurringInvoices, markOverdueInvoices };
+module.exports = { startCronJobs, checkAndUpdateBlockStatus, checkAllProjects, generateRecurringInvoices, markOverdueInvoices, processReminders };

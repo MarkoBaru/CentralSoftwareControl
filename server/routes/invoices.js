@@ -355,3 +355,4 @@ async function createRecurringInvoice(project_id, amount, period_month, period_y
 
 module.exports = router;
 module.exports.createRecurringInvoice = createRecurringInvoice;
+module.exports.generatePDF = generatePDF;
