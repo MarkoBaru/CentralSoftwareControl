@@ -44,4 +44,40 @@ router.get('/actions', authMiddleware, (req, res) => {
   res.json(rows.map(r => r.action));
 });
 
+// GET /api/activity/export - CSV-Export
+function csvEscape(value) {
+  if (value == null) return '';
+  const s = String(value);
+  if (/[",\r\n;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+router.get('/export', authMiddleware, (req, res) => {
+  const filters = [];
+  const params = [];
+  if (req.query.action) { filters.push('a.action = ?'); params.push(req.query.action); }
+  if (req.query.project_id) { filters.push('a.project_id = ?'); params.push(req.query.project_id); }
+  if (req.query.since) { filters.push('a.created_at >= ?'); params.push(req.query.since); }
+  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+  const rows = db.prepare(`
+    SELECT a.created_at, a.action, p.name AS project_name, a.project_id, a.details, a.performed_by
+    FROM activity_log a
+    LEFT JOIN projects p ON a.project_id = p.id
+    ${where}
+    ORDER BY a.created_at DESC
+  `).all(...params);
+
+  const header = 'Zeitpunkt;Aktion;Projekt;Projekt-ID;Details;Ausgefuehrt von';
+  const lines = rows.map(r => [
+    r.created_at, r.action, r.project_name || '', r.project_id || '', r.details || '', r.performed_by || ''
+  ].map(csvEscape).join(';'));
+  const csv = '\uFEFF' + [header, ...lines].join('\r\n'); // UTF-8 BOM fuer Excel
+
+  const filename = `activity_${new Date().toISOString().split('T')[0]}.csv`;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csv);
+});
+
 module.exports = router;

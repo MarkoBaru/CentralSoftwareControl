@@ -46,6 +46,7 @@ const api = {
   // Activity-Log
   getActivity: (params = {}) => axios.get(`${API_URL}/activity`, { params }),
   getActivityActions: () => axios.get(`${API_URL}/activity/actions`),
+  exportActivity: (params = {}) => axios.get(`${API_URL}/activity/export`, { params, responseType: 'blob' }),
   processReminders: () => axios.post(`${API_URL}/settings/process-reminders`),
 };
 

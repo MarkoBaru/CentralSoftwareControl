@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { FiActivity, FiRefreshCw, FiMail } from 'react-icons/fi';
+import { FiActivity, FiRefreshCw, FiMail, FiDownload } from 'react-icons/fi';
 import api from '../api';
 
 const ACTION_LABELS = {
@@ -70,6 +70,24 @@ export default function ActivityPage() {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      const params = {};
+      if (filter.action) params.action = filter.action;
+      const res = await api.exportActivity(params);
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activity_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -79,6 +97,9 @@ export default function ActivityPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost" onClick={load} disabled={loading}>
             <FiRefreshCw /> Aktualisieren
+          </button>
+          <button className="btn btn-ghost" onClick={exportCsv}>
+            <FiDownload /> CSV-Export
           </button>
           <button className="btn btn-primary" onClick={triggerReminders}>
             <FiMail /> Mahnwesen ausführen
