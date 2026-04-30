@@ -11,6 +11,7 @@ const userRoutes = require('./routes/users');
 const paymentRoutes = require('./routes/payments');
 const settingsRoutes = require('./routes/settings');
 const invoiceRoutes = require('./routes/invoices');
+const activityRoutes = require('./routes/activity');
 const { startCronJobs } = require('./services/cronService');
 
 const app = express();
@@ -62,6 +63,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Client-SDK statisch ausliefern
 app.use('/client', express.static(path.join(__dirname, '..', 'client-sdk')));

@@ -42,6 +42,11 @@ const api = {
   sendInvoice: (id) => axios.post(`${API_URL}/invoices/${id}/send`),
   deleteInvoice: (id) => axios.delete(`${API_URL}/invoices/${id}`),
   getInvoicePdfUrl: (id) => `${API_URL}/invoices/${id}/pdf`,
+
+  // Activity-Log
+  getActivity: (params = {}) => axios.get(`${API_URL}/activity`, { params }),
+  getActivityActions: () => axios.get(`${API_URL}/activity/actions`),
+  processReminders: () => axios.post(`${API_URL}/settings/process-reminders`),
 };
 
 export default api;
