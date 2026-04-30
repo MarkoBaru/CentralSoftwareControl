@@ -95,4 +95,20 @@ db.exec(`
   );
 `);
 
+// Migrationen: neue Spalten sicher hinzufügen
+function safeAddColumn(table, column, definition) {
+  try {
+    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+  } catch (e) {
+    // Spalte existiert bereits → ignorieren
+  }
+}
+
+safeAddColumn('projects', 'client_address', 'TEXT');
+safeAddColumn('projects', 'client_zip', 'TEXT');
+safeAddColumn('projects', 'client_city', 'TEXT');
+safeAddColumn('invoices', 'qr_reference', 'TEXT');
+safeAddColumn('payment_settings', 'auto_invoice', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('payment_settings', 'invoice_day', 'INTEGER NOT NULL DEFAULT 1');
+
 module.exports = db;
