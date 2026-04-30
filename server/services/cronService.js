@@ -1,8 +1,9 @@
 const cron = require('node-cron');
 const db = require('../database');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { sendBlockNotification, sendUnblockNotification, sendInvoiceMail, sendPaymentReminder } = require('./emailService');
 const { syncBankPayments } = require('./bankService');
+const { createBackup } = require('./backupService');
 
 /**
  * Kernlogik: Zahlungsstatus für ein Projekt prüfen und Block-Status setzen.
@@ -233,6 +234,15 @@ function startCronJobs() {
       console.log(`[Cron] Statusprüfung: ${blocked} blockiert, ${unblocked} freigegeben`);
     } catch (e) {
       console.error('[Cron] Prüfungsfehler:', e.message);
+    }
+  }, { timezone: 'Europe/Zurich' });
+
+  // Taegliches Backup um 03:00
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      await createBackup();
+    } catch (e) {
+      console.error('[Cron] Backup-Fehler:', e.message);
     }
   }, { timezone: 'Europe/Zurich' });
 

@@ -123,4 +123,34 @@ router.post('/process-reminders', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/settings/backups - Liste aller Backups
+router.get('/backups', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
+  const { listBackups } = require('../services/backupService');
+  res.json(listBackups());
+});
+
+// POST /api/settings/backups - Manuelles Backup erstellen
+router.post('/backups', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
+  const { createBackup } = require('../services/backupService');
+  try {
+    const file = await createBackup();
+    res.json({ message: 'Backup erstellt', file: require('path').basename(file) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/settings/backups/:filename - Backup herunterladen
+router.get('/backups/:filename', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
+  const { BACKUP_DIR } = require('../services/backupService');
+  const path = require('path');
+  const fname = path.basename(req.params.filename);
+  if (!/^database-[\w\-]+\.sqlite$/.test(fname)) return res.status(400).json({ error: 'Ungueltiger Dateiname' });
+  const filePath = path.join(BACKUP_DIR, fname);
+  res.download(filePath, fname);
+});
+
 module.exports = router;

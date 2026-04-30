@@ -48,6 +48,17 @@ const api = {
   getActivityActions: () => axios.get(`${API_URL}/activity/actions`),
   exportActivity: (params = {}) => axios.get(`${API_URL}/activity/export`, { params, responseType: 'blob' }),
   processReminders: () => axios.post(`${API_URL}/settings/process-reminders`),
+
+  // Backups
+  listBackups: () => axios.get(`${API_URL}/settings/backups`),
+  createBackup: () => axios.post(`${API_URL}/settings/backups`),
+  downloadBackupUrl: (filename) => `${API_URL}/settings/backups/${encodeURIComponent(filename)}`,
+
+  // 2FA
+  twoFaStatus: () => axios.get(`${API_URL}/auth/2fa/status`),
+  twoFaSetup: () => axios.post(`${API_URL}/auth/2fa/setup`),
+  twoFaEnable: (token) => axios.post(`${API_URL}/auth/2fa/enable`, { token }),
+  twoFaDisable: (token) => axios.post(`${API_URL}/auth/2fa/disable`, { token }),
 };
 
 export default api;
