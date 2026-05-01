@@ -6,9 +6,10 @@ export default function LoginPage() {
   const { login, setup, user } = useAuth();
   const navigate = useNavigate();
   const [isSetup, setIsSetup] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', name: '' });
+  const [form, setForm] = useState({ email: '', password: '', name: '', totp: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needs2fa, setNeeds2fa] = useState(false);
 
   // Bereits eingeloggt → weiter zum Dashboard
   if (user) return <Navigate to="/" />;
@@ -21,12 +22,17 @@ export default function LoginPage() {
       if (isSetup) {
         await setup(form.email, form.password, form.name);
       } else {
-        await login(form.email, form.password);
+        await login(form.email, form.password, needs2fa ? form.totp : undefined);
       }
       navigate('/');
     } catch (err) {
-      const msg = err.response?.data?.error || 'Verbindungsfehler';
-      setError(msg);
+      const data = err.response?.data || {};
+      if (data.requires_2fa) {
+        setNeeds2fa(true);
+        setError(data.error || '2FA-Code erforderlich');
+      } else {
+        setError(data.error || 'Verbindungsfehler');
+      }
     }
     setLoading(false);
   };
@@ -67,6 +73,21 @@ export default function LoginPage() {
               required
             />
           </div>
+          {needs2fa && !isSetup && (
+            <div className="form-group">
+              <label>2FA-Code (Authenticator-App)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={form.totp}
+                onChange={(e) => setForm({ ...form, totp: e.target.value.replace(/\D/g, '') })}
+                autoFocus
+                required
+              />
+            </div>
+          )}
           <button className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
             {loading ? 'Laden...' : isSetup ? 'Konto erstellen' : 'Anmelden'}
           </button>

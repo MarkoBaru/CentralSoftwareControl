@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 
-const TABS = ['Firma', 'E-Mail / SMTP', 'Bank-API', 'camt.054 Upload'];
+const TABS = ['Firma', 'E-Mail / SMTP', 'Bank-API', 'camt.054 Upload', 'Sicherheit (2FA)', 'Backups'];
 
 const INPUT_GROUPS = {
   'Firma': [
@@ -119,6 +119,7 @@ export default function SettingsPage() {
   if (loading) return <div style={{ padding: '2rem', color: 'var(--gray-500)' }}>Lade Einstellungen...</div>;
 
   const fields = INPUT_GROUPS[activeTab] || [];
+  const isFormTab = !!INPUT_GROUPS[activeTab];
 
   return (
     <div>
@@ -143,7 +144,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {activeTab !== 'camt.054 Upload' && (
+      {isFormTab && (
         <div className="card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
             {fields.map(f => (
@@ -190,6 +191,10 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {activeTab === 'Sicherheit (2FA)' && <TwoFactorPanel onMsg={setMsg} />}
+
+      {activeTab === 'Backups' && <BackupsPanel onMsg={setMsg} />}
+
       {activeTab === 'camt.054 Upload' && (
         <div className="card" style={{ padding: '1.5rem' }}>
           <p style={{ color: 'var(--gray-600)', marginBottom: '1rem' }}>
@@ -222,6 +227,186 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function TwoFactorPanel({ onMsg }) {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [setupData, setSetupData] = useState(null); // { secret, qr }
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.twoFaStatus();
+      setEnabled(!!res.data.enabled);
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const startSetup = async () => {
+    setBusy(true);
+    try {
+      const res = await api.twoFaSetup();
+      setSetupData(res.data);
+    } catch (err) {
+      onMsg({ type: 'error', text: err.response?.data?.error || 'Setup fehlgeschlagen' });
+    } finally { setBusy(false); }
+  };
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await api.twoFaEnable(token);
+      onMsg({ type: 'success', text: '2FA wurde aktiviert' });
+      setSetupData(null);
+      setToken('');
+      await load();
+    } catch (err) {
+      onMsg({ type: 'error', text: err.response?.data?.error || 'Aktivierung fehlgeschlagen' });
+    } finally { setBusy(false); }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    try {
+      await api.twoFaDisable(token);
+      onMsg({ type: 'success', text: '2FA wurde deaktiviert' });
+      setToken('');
+      await load();
+    } catch (err) {
+      onMsg({ type: 'error', text: err.response?.data?.error || 'Deaktivierung fehlgeschlagen' });
+    } finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="card" style={{ padding: '1.5rem' }}>Lade Status...</div>;
+
+  return (
+    <div className="card" style={{ padding: '1.5rem' }}>
+      <h2 style={{ marginTop: 0 }}>Zwei-Faktor-Authentifizierung (TOTP)</h2>
+      <p style={{ color: 'var(--gray-600)' }}>
+        Status: <strong>{enabled ? 'aktiviert' : 'deaktiviert'}</strong>.
+        Kompatibel mit Google Authenticator, Authy, Microsoft Authenticator, 1Password.
+      </p>
+
+      {!enabled && !setupData && (
+        <button className="btn btn-primary" onClick={startSetup} disabled={busy}>
+          Einrichtung starten
+        </button>
+      )}
+
+      {!enabled && setupData && (
+        <div>
+          <p>1. Scannen Sie den QR-Code mit Ihrer Authenticator-App:</p>
+          <img src={setupData.qr} alt="2FA QR-Code" style={{ display: 'block', margin: '1rem 0' }} />
+          <p style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+            Manuell: <code>{setupData.secret}</code>
+          </p>
+          <p>2. Geben Sie den 6-stelligen Code aus der App ein:</p>
+          <div style={{ display: 'flex', gap: '0.5rem', maxWidth: 320 }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              className="form-control"
+              value={token}
+              onChange={e => setToken(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+            />
+            <button className="btn btn-primary" onClick={enable} disabled={busy || token.length !== 6}>
+              Aktivieren
+            </button>
+          </div>
+        </div>
+      )}
+
+      {enabled && (
+        <div>
+          <p>Zur Deaktivierung bitte aktuellen Code aus der Authenticator-App eingeben:</p>
+          <div style={{ display: 'flex', gap: '0.5rem', maxWidth: 320 }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              className="form-control"
+              value={token}
+              onChange={e => setToken(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+            />
+            <button className="btn btn-ghost" onClick={disable} disabled={busy || token.length !== 6}>
+              2FA deaktivieren
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BackupsPanel({ onMsg }) {
+  const [backups, setBackups] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.listBackups();
+      setBackups(res.data || []);
+    } catch (err) {
+      onMsg({ type: 'error', text: err.response?.data?.error || 'Laden fehlgeschlagen' });
+    } finally { setLoading(false); }
+  }, [onMsg]);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const res = await api.createBackup();
+      onMsg({ type: 'success', text: `Backup erstellt: ${res.data.file}` });
+      await load();
+    } catch (err) {
+      onMsg({ type: 'error', text: err.response?.data?.error || 'Backup fehlgeschlagen' });
+    } finally { setBusy(false); }
+  };
+
+  const fmtSize = (b) => (b / 1024 / 1024).toFixed(2) + ' MB';
+  const token = localStorage.getItem('ccd_token');
+
+  return (
+    <div className="card" style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0 }}>Datenbank-Backups</h2>
+        <button className="btn btn-primary" onClick={create} disabled={busy}>
+          {busy ? 'Erstellt...' : 'Jetzt Backup erstellen'}
+        </button>
+      </div>
+      <p style={{ color: 'var(--gray-600)' }}>
+        Tägliches Backup um 03:00 Europe/Zurich. Aufbewahrung: 14 Snapshots.
+      </p>
+      {loading ? <div>Lade...</div> : (
+        <table className="data-table">
+          <thead><tr><th>Dateiname</th><th>Größe</th><th>Erstellt</th><th></th></tr></thead>
+          <tbody>
+            {backups.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--gray-500)' }}>Keine Backups vorhanden</td></tr>}
+            {backups.map(b => (
+              <tr key={b.filename}>
+                <td style={{ fontFamily: 'monospace' }}>{b.filename}</td>
+                <td>{fmtSize(b.size)}</td>
+                <td>{new Date(b.created_at).toLocaleString('de-CH')}</td>
+                <td>
+                  <a className="btn btn-ghost btn-sm" href={`${api.downloadBackupUrl(b.filename)}?token=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer">
+                    Download
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

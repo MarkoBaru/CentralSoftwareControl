@@ -27,8 +27,9 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, [token]);
 
-  const login = async (email, password) => {
-    const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+  const login = async (email, password, totp) => {
+    const payload = totp ? { email, password, totp } : { email, password };
+    const res = await axios.post(`${API_URL}/auth/login`, payload);
     const { token: newToken, user: userData } = res.data;
     localStorage.setItem('ccd_token', newToken);
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;

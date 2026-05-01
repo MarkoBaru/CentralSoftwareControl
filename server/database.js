@@ -112,6 +112,8 @@ safeAddColumn('payment_settings', 'auto_invoice', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('payment_settings', 'invoice_day', 'INTEGER NOT NULL DEFAULT 1');
 safeAddColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('invoices', 'last_reminder_at', 'TEXT');
+safeAddColumn('users', 'totp_secret', 'TEXT');
+safeAddColumn('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0');
 
 // Migration: Klartext-Geheimnisse in app_settings nachtraeglich verschluesseln
 try {
