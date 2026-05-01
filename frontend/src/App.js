@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { FiGrid, FiFolder, FiUsers, FiLogOut, FiSettings, FiFileText, FiActivity } from 'react-icons/fi';
+import { FiGrid, FiFolder, FiUsers, FiLogOut, FiSettings, FiFileText, FiActivity, FiSun, FiMoon } from 'react-icons/fi';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -14,6 +14,14 @@ import './App.css';
 
 function Layout({ children }) {
   const { user, logout } = useAuth();
+  const [theme, setTheme] = useState(() => localStorage.getItem('ccd_theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('ccd_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   return (
     <div className="app-layout">
@@ -43,6 +51,14 @@ function Layout({ children }) {
         </div>
         <div className="sidebar-user">
           <span>{user?.name || user?.email}</span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Helles Theme' : 'Dunkles Theme'}
+            style={{ color: 'rgba(255,255,255,0.7)' }}
+          >
+            {theme === 'dark' ? <FiSun /> : <FiMoon />}
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={logout} style={{ color: 'rgba(255,255,255,0.7)' }}>
             <FiLogOut />
           </button>

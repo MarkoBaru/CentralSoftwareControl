@@ -4,6 +4,12 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Theme moeglichst frueh setzen, um Flackern zu vermeiden
+try {
+  const saved = localStorage.getItem('ccd_theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+} catch (e) { /* ignore */ }
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
