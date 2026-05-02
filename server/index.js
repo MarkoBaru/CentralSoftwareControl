@@ -14,6 +14,8 @@ const paymentRoutes = require('./routes/payments');
 const settingsRoutes = require('./routes/settings');
 const invoiceRoutes = require('./routes/invoices');
 const activityRoutes = require('./routes/activity');
+const auditRoutes = require('./routes/audit');
+const healthRoutes = require('./routes/health');
 const { startCronJobs } = require('./services/cronService');
 
 const app = express();
@@ -86,6 +88,7 @@ const apiLimiter = rateLimit({
 
 // API-Routen
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/password-reset/request', loginLimiter);
 app.use('/api/', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
@@ -95,6 +98,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/health', healthRoutes);
 
 // Client-SDK statisch ausliefern
 app.use('/client', express.static(path.join(__dirname, '..', 'client-sdk')));
