@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { isBlacklisted } = require('../services/tokenBlacklist');
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -14,7 +15,12 @@ function authMiddleware(req, res, next) {
   }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.jti && isBlacklisted(decoded.jti)) {
+      return res.status(401).json({ error: 'Token wurde widerrufen' });
+    }
     req.user = decoded;
+    req.tokenJti = decoded.jti || null;
+    req.tokenExp = decoded.exp || null;
     next();
   } catch {
     return res.status(401).json({ error: 'Ungültiges Token' });
@@ -22,3 +28,4 @@ function authMiddleware(req, res, next) {
 }
 
 module.exports = authMiddleware;
+module.exports.authMiddleware = authMiddleware;

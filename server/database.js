@@ -77,6 +77,37 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    user_id TEXT,
+    user_email TEXT,
+    ip TEXT,
+    details TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+
+  CREATE TABLE IF NOT EXISTS token_blacklist (
+    jti TEXT PRIMARY KEY,
+    user_id TEXT,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_blacklist_expires ON token_blacklist(expires_at);
+
+  CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS invoices (
     id TEXT PRIMARY KEY,
     invoice_number TEXT UNIQUE NOT NULL,
@@ -114,6 +145,7 @@ safeAddColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('invoices', 'last_reminder_at', 'TEXT');
 safeAddColumn('users', 'totp_secret', 'TEXT');
 safeAddColumn('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('users', 'password_changed_at', 'TEXT');
 
 // Migration: Klartext-Geheimnisse in app_settings nachtraeglich verschluesseln
 try {

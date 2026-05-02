@@ -246,6 +246,17 @@ function startCronJobs() {
     }
   }, { timezone: 'Europe/Zurich' });
 
+  // Stuendlicher Cleanup abgelaufener Blacklist-Eintraege
+  cron.schedule('0 * * * *', () => {
+    try {
+      const { cleanupExpired } = require('./tokenBlacklist');
+      const removed = cleanupExpired();
+      if (removed > 0) console.log(`[Cron] Token-Blacklist: ${removed} abgelaufene entfernt`);
+    } catch (e) {
+      console.error('[Cron] Blacklist-Cleanup-Fehler:', e.message);
+    }
+  }, { timezone: 'Europe/Zurich' });
+
   console.log('[Cron] Jobs gestartet (täglich 08:00 Uhr Europe/Zurich)');
 }
 

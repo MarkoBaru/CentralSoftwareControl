@@ -120,4 +120,22 @@ async function sendPaymentReminder(project, invoice, level, pdfBuffer) {
   });
 }
 
-module.exports = { sendMail, sendBlockNotification, sendUnblockNotification, sendInvoiceMail, sendPaymentReminder };
+module.exports = { sendMail, sendBlockNotification, sendUnblockNotification, sendInvoiceMail, sendPaymentReminder, sendPasswordResetMail };
+
+async function sendPasswordResetMail(user, resetUrl) {
+  const s = getSettings();
+  const company = s.company_name || 'Control Dashboard';
+  return sendMail({
+    to: user.email,
+    subject: `[${company}] Passwort zuruecksetzen`,
+    html: `
+      <h2>Passwort zuruecksetzen</h2>
+      <p>Hallo ${user.name || user.email},</p>
+      <p>du (oder jemand) hat einen Passwort-Reset fuer dein Konto angefordert.</p>
+      <p><a href="${resetUrl}">Klicke hier, um ein neues Passwort zu setzen</a></p>
+      <p>Der Link ist <strong>1 Stunde</strong> gueltig.</p>
+      <p>Solltest du dies nicht angefordert haben, ignoriere diese E-Mail einfach.</p>
+      <p>Mit freundlichen Gruessen<br/>${company}</p>
+    `,
+  });
+}

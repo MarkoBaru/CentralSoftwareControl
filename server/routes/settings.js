@@ -134,9 +134,12 @@ router.get('/backups', authMiddleware, (req, res) => {
 router.post('/backups', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
   const { createBackup } = require('../services/backupService');
+  const { logAudit, getRequestIp } = require('../services/auditService');
   try {
     const file = await createBackup();
-    res.json({ message: 'Backup erstellt', file: require('path').basename(file) });
+    const filename = require('path').basename(file);
+    logAudit({ action: 'backup_created', user_id: req.user.id, user_email: req.user.email, ip: getRequestIp(req), details: { file: filename, manual: true } });
+    res.json({ message: 'Backup erstellt', file: filename });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -146,10 +149,12 @@ router.post('/backups', authMiddleware, async (req, res) => {
 router.get('/backups/:filename', authMiddleware, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins' });
   const { BACKUP_DIR } = require('../services/backupService');
+  const { logAudit, getRequestIp } = require('../services/auditService');
   const path = require('path');
   const fname = path.basename(req.params.filename);
   if (!/^database-[\w\-]+\.sqlite$/.test(fname)) return res.status(400).json({ error: 'Ungueltiger Dateiname' });
   const filePath = path.join(BACKUP_DIR, fname);
+  logAudit({ action: 'backup_downloaded', user_id: req.user.id, user_email: req.user.email, ip: getRequestIp(req), details: { file: fname } });
   res.download(filePath, fname);
 });
 
