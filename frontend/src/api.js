@@ -59,6 +59,18 @@ const api = {
   twoFaSetup: () => axios.post(`${API_URL}/auth/2fa/setup`),
   twoFaEnable: (token) => axios.post(`${API_URL}/auth/2fa/enable`, { token }),
   twoFaDisable: (token) => axios.post(`${API_URL}/auth/2fa/disable`, { token }),
+
+  // Auth-Erweiterungen
+  logout: () => axios.post(`${API_URL}/auth/logout`),
+  requestPasswordReset: (email) => axios.post(`${API_URL}/auth/password-reset/request`, { email }),
+  confirmPasswordReset: (token, password) => axios.post(`${API_URL}/auth/password-reset/confirm`, { token, password }),
+
+  // Audit-Log
+  getAudit: (params = {}) => axios.get(`${API_URL}/audit`, { params }),
+  getAuditActions: () => axios.get(`${API_URL}/audit/actions`),
+
+  // Health
+  getHealth: () => axios.get(`${API_URL}/health`),
 };
 
 export default api;

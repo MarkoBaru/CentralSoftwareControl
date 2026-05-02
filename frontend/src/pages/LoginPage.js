@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -99,6 +99,11 @@ export default function LoginPage() {
           >
             {isSetup ? 'Zurück zum Login' : 'Erstes Admin-Konto erstellen'}
           </button>
+          {!isSetup && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <Link to="/forgot-password" style={{ fontSize: '0.9em' }}>Passwort vergessen?</Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

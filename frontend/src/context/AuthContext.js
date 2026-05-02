@@ -46,7 +46,12 @@ export function AuthProvider({ children }) {
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await axios.post(`${API_URL}/auth/logout`);
+    } catch (_) {
+      // egal - Token wird so oder so lokal verworfen
+    }
     localStorage.removeItem('ccd_token');
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
